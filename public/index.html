@@ -6,7 +6,7 @@
   <title>WhatsApp Customer Inbox</title>
   <style>
     body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: #efeae2; }
-    .sidebar { width: 30%, min-width: 250px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+    .sidebar { width: 30%; min-width: 250px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
     .sidebar-header { padding: 15px; background: #00a884; color: white; font-weight: bold; }
     .contact-list { overflow-y: auto; flex: 1; }
     .contact-item { padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
@@ -27,15 +27,11 @@
 </head>
 <body>
 
-  <!-- Sidebar Daftar Kontak -->
   <div class="sidebar">
     <div class="sidebar-header">Daftar Percakapan</div>
-    <div class="contact-list" id="contactList">
-      <!-- Daftar kontak akan dimuat di sini -->
-    </div>
+    <div class="contact-list" id="contactList"></div>
   </div>
 
-  <!-- Area Chat Utama -->
   <div class="chat-area">
     <div class="chat-header" id="chatHeader">Pilih kontak di sebelah kiri</div>
     <div class="chat-messages" id="chatMessages">
@@ -119,7 +115,7 @@
 
         if (res.ok) {
           inputEl.value = '';
-          fetchChats(); // Refresh data chat
+          fetchChats();
         } else {
           alert('Gagal mengirim pesan.');
         }
@@ -128,9 +124,9 @@
       }
     }
 
-    // Polling otomatis setiap 3 detik untuk memperbarui daftar chat & pesan masuk
     setInterval(fetchChats, 3000);
     fetchChats();
   </script>
 </body>
 </html>
+
