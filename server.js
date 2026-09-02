@@ -1,24 +1,44 @@
-// Simpan riwayat chat dalam memori berformat objek: { "62812345678": [ {sender: 'user', text: 'halo', time: '...'} ] }
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
 let chatHistories = {};
 
-// Endpoint untuk menerima webhook dari Meta (Pesan Masuk)
+// Webhook Verification Meta
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
+  }
+  return res.sendStatus(403);
+});
+
+// Terima Pesan Masuk
 app.post('/webhook', (req, res) => {
   const body = req.body;
   if (body.object === 'whatsapp_business_account') {
-    body.entry.forEach(entry => {
-      entry.changes.forEach(change => {
-        if (change.value.messages) {
+    body.entry?.forEach(entry => {
+      entry.changes?.forEach(change => {
+        if (change.value?.messages) {
           change.value.messages.forEach(msg => {
-            const senderPhone = msg.from; // Nomor pengirim
-            const messageText = msg.text ? msg.text.body : '[Media/Non-Teks]';
-            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const senderPhone = msg.from;
+            const messageText = msg.text ? msg.text.body : '[Media/Pesan Non-Teks]';
+            const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-            // Inisialisasi array jika nomor belum ada
             if (!chatHistories[senderPhone]) {
               chatHistories[senderPhone] = [];
             }
 
-            // Masukkan pesan ke riwayat nomor tersebut
             chatHistories[senderPhone].push({
               sender: 'customer',
               text: messageText,
@@ -28,18 +48,17 @@ app.post('/webhook', (req, res) => {
         }
       });
     });
-    res.status(200).send('EVENT_RECEIVED');
-  } else {
-    res.sendStatus(404);
+    return res.status(200).send('EVENT_RECEIVED');
   }
+  return res.sendStatus(404);
 });
 
-// Endpoint untuk mengambil semua daftar kontak dan chat
+// Ambil Daftar Chat
 app.get('/api/chats', (req, res) => {
   res.json(chatHistories);
 });
 
-// Endpoint untuk mengirim pesan (Teks biasa / Balasan CS)
+// Kirim Pesan Teks
 app.post('/api/send', async (req, res) => {
   const { to, message } = req.body;
   if (!to || !message) return res.status(400).json({ error: 'Nomor dan pesan wajib diisi' });
@@ -60,10 +79,9 @@ app.post('/api/send', async (req, res) => {
     });
 
     const data = await response.json();
-    if (!response.ok) return res.status(400).json({ error: data.error.message });
+    if (!response.ok) return res.status(400).json({ error: data.error?.message || 'Gagal kirim' });
 
-    // Simpan pesan keluar ke riwayat kontak tersebut
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     if (!chatHistories[to]) chatHistories[to] = [];
     chatHistories[to].push({
       sender: 'agent',
@@ -73,6 +91,11 @@ app.post('/api/send', async (req, res) => {
 
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ error: 'Gagal kirim pesan' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+export default app;
