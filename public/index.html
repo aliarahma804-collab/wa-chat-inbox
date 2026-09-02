@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Customer Inbox</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: #efeae2; }
+    .sidebar { width: 320px; min-width: 260px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 15px; background: #00a884; color: white; font-weight: bold; }
+    .add-contact-box { padding: 10px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; gap: 6px; background: #f9f9f9; }
+    .add-contact-box input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    .add-contact-box button { background: #00a884; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+    .contact-list { overflow-y: auto; flex: 1; }
+    .contact-item { padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+    .contact-item:hover, .contact-item.active { background: #f0f2f5; }
+    
+    .chat-area { flex: 1; display: flex; flex-direction: column; background: #efeae2; }
+    .chat-header { padding: 15px; background: #f0f2f5; font-weight: bold; border-bottom: 1px solid #ddd; }
+    .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .message { max-width: 60%; padding: 10px; border-radius: 8px; font-size: 14px; position: relative; }
+    .message.customer { background: white; align-self: flex-start; }
+    .message.agent { background: #d9fdd3; align-self: flex-end; }
+    .time { font-size: 10px; color: #999; margin-top: 4px; text-align: right; }
+    
+    .chat-input { padding: 15px; background: #f0f2f5; display: flex; gap: 10px; }
+    .chat-input input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
+    .chat-input button { background: #00a884; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar Daftar Kontak -->
+  <div class="sidebar">
+    <div class="sidebar-header">Daftar Percakapan</div>
+    
+    <!-- Form Tambah Kontak Baru Manual -->
+    <div class="add-contact-box">
+      <input type="text" id="newPhoneInput" placeholder="Nomor: 6285143545042" />
+      <button onclick="addNewContact()">+ Tambah Kontak</button>
+    </div>
+
+    <div class="contact-list" id="contactList"></div>
+  </div>
+
+  <!-- Area Chat Utama -->
+  <div class="chat-area">
+    <div class="chat-header" id="chatHeader">Pilih kontak di sebelah kiri</div>
+    <div class="chat-messages" id="chatMessages">
+      <div style="text-align: center; color: #777; margin-top: 50px;">Belum ada obrolan yang dipilih</div>
+    </div>
+    <div class="chat-input" id="chatInputArea" style="display: none;">
+      <input type="text" id="messageInput" placeholder="Ketik pesan balasan..." />
+      <button onclick="sendMessage()">Kirim</button>
+    </div>
+  </div>
+
+  <script>
+    let allChats = {};
+    let activeContact = null;
+
+    function addNewContact() {
+      const input = document.getElementById('newPhoneInput');
+      let phone = input.value.trim().replace(/[^0-9]/g, '');
+      
+      if (!phone) {
+        alert('Masukkan nomor WhatsApp yang valid!');
+        return;
+      }
+      if (phone.startsWith('0')) {
+        phone = '62' + phone.slice(1);
+      }
+
+      if (!allChats[phone]) {
+        allChats[phone] = [];
+      }
+      
+      input.value = '';
+      renderContacts();
+      selectContact(phone);
+    }
+
+    async function fetchChats() {
+      try {
+        const res = await fetch('/api/chats');
+        const data = await res.json();
+        
+        allChats = { ...allChats, ...data };
+        renderContacts();
+        if (activeContact && allChats[activeContact]) {
+          renderMessages(activeContact);
+        }
+      } catch (err) {
+        console.error("Gagal memuat chat:", err);
+      }
+    }
+
+    function renderContacts() {
+      const listEl = document.getElementById('contactList');
+      listEl.innerHTML = '';
+      
+      const contacts = Object.keys(allChats);
+      if (contacts.length === 0) {
+        listEl.innerHTML = '<div style="padding: 15px; color: #777;">Belum ada kontak</div>';
+        return;
+      }
+
+      contacts.forEach(phone => {
+        const div = document.createElement('div');
+        div.className = `contact-item ${activeContact === phone ? 'active' : ''}`;
+        div.innerHTML = `<strong>+${phone}</strong>`;
+        div.onclick = () => selectContact(phone);
+        listEl.appendChild(div);
+      });
+    }
+
+    function selectContact(phone) {
+      activeContact = phone;
+      document.getElementById('chatHeader').innerText = `Chat dengan: +${phone}`;
+      document.getElementById('chatInputArea').style.display = 'flex';
+      renderContacts();
+      renderMessages(phone);
+    }
+
+    function renderMessages(phone) {
+      const messagesEl = document.getElementById('chatMessages');
+      messagesEl.innerHTML = '';
+      
+      const messages = allChats[phone] || [];
+      if (messages.length === 0) {
+        messagesEl.innerHTML = '<div style="text-align: center; color: #777; margin-top: 50px;">Belum ada riwayat pesan. Kirim pesan pertama untuk memulai.</div>';
+        return;
+      }
+
+      messages.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `message ${msg.sender === 'customer' ? 'customer' : 'agent'}`;
+        div.innerHTML = `<div>${msg.text}</div><div class="time">${msg.time}</div>`;
+        messagesEl.appendChild(div);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const inputEl = document.getElementById('messageInput');
+      const text = inputEl.value.trim();
+      if (!text || !activeContact) return;
+
+      try {
+        const res = await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: activeContact, message: text })
+        });
+
+        if (res.ok) {
+          inputEl.value = '';
+          fetchChats();
+        } else {
+          alert('Gagal mengirim pesan. Pastikan nomor sudah aktif atau kirimkan template terlebih dahulu.');
+        }
+      } catch (err) {
+        console.error("Error:", err);
+      }
+    }
+
+    setInterval(fetchChats, 3000);
+    fetchChats();
+  </script>
+</body>
+</html>
