@@ -3,80 +3,134 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WhatsApp Web Inbox</title>
+  <title>WhatsApp Customer Inbox</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-    body { background: #efeae2; display: flex; flex-direction: column; height: 100vh; }
-    header { background: #075e54; color: white; padding: 14px; font-weight: bold; }
-    #chat-box { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-    .msg { max-width: 80%; padding: 8px 12px; border-radius: 8px; font-size: 14px; position: relative; }
-    .in { background: #ffffff; align-self: flex-start; }
-    .out { background: #dcf8c6; align-self: flex-end; }
-    .sender { font-size: 11px; color: #555; margin-bottom: 2px; }
-    .time { font-size: 10px; color: #888; text-align: right; margin-top: 4px; }
-    footer { display: flex; flex-direction: column; background: #f0f0f0; padding: 8px; gap: 6px; }
-    .input-row { display: flex; gap: 6px; }
-    input { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; }
-    #to { width: 140px; }
-    #text { flex: 1; }
-    button { background: #128c7e; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: #efeae2; }
+    .sidebar { width: 30%, min-width: 250px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 15px; background: #00a884; color: white; font-weight: bold; }
+    .contact-list { overflow-y: auto; flex: 1; }
+    .contact-item { padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+    .contact-item:hover, .contact-item.active { background: #f0f2f5; }
+    
+    .chat-area { flex: 1; display: flex; flex-direction: column; background: #efeae2; }
+    .chat-header { padding: 15px; background: #f0f2f5; font-weight: bold; border-bottom: 1px solid #ddd; }
+    .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .message { max-width: 60%; padding: 10px; border-radius: 8px; font-size: 14px; position: relative; }
+    .message.customer { background: white; align-self: flex-start; }
+    .message.agent { background: #d9fdd3; align-self: flex-end; }
+    .time { font-size: 10px; color: #999; margin-top: 4px; text-align: right; }
+    
+    .chat-input { padding: 15px; background: #f0f2f5; display: flex; gap: 10px; }
+    .chat-input input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
+    .chat-input button { background: #00a884; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
   </style>
 </head>
 <body>
-  <header>WhatsApp Customer Inbox</header>
-  <div id="chat-box"></div>
-  <footer>
-    <div class="input-row">
-      <input type="text" id="to" placeholder="Nomor: 628xxx" />
-      <input type="text" id="text" placeholder="Ketik balasan..." />
-      <button onclick="kirimPesan()">Kirim</button>
+
+  <!-- Sidebar Daftar Kontak -->
+  <div class="sidebar">
+    <div class="sidebar-header">Daftar Percakapan</div>
+    <div class="contact-list" id="contactList">
+      <!-- Daftar kontak akan dimuat di sini -->
     </div>
-  </footer>
+  </div>
+
+  <!-- Area Chat Utama -->
+  <div class="chat-area">
+    <div class="chat-header" id="chatHeader">Pilih kontak di sebelah kiri</div>
+    <div class="chat-messages" id="chatMessages">
+      <div style="text-align: center; color: #777; margin-top: 50px;">Belum ada obrolan yang dipilih</div>
+    </div>
+    <div class="chat-input" id="chatInputArea" style="display: none;">
+      <input type="text" id="messageInput" placeholder="Ketik pesan balasan..." />
+      <button onclick="sendMessage()">Kirim</button>
+    </div>
+  </div>
 
   <script>
-    async function muatPesan() {
+    let allChats = {};
+    let activeContact = null;
+
+    async function fetchChats() {
       try {
-        const res = await fetch('/api/messages');
-        const data = await res.json();
-        const box = document.getElementById('chat-box');
-        box.innerHTML = '';
-        data.forEach(m => {
-          const div = document.createElement('div');
-          div.className = `msg ${m.direction}`;
-          div.innerHTML = `
-            <div class="sender">${m.direction === 'in' ? m.from : 'Saya'}</div>
-            <div>${m.text}</div>
-            <div class="time">${m.time}</div>
-          `;
-          box.appendChild(div);
-        });
-        box.scrollTop = box.scrollHeight;
-      } catch (err) {}
-    }
-
-    async function kirimPesan() {
-      const to = document.getElementById('to').value.trim();
-      const text = document.getElementById('text').value.trim();
-      if (!to || !text) return alert('Nomor dan pesan harus diisi!');
-
-      const res = await fetch('/api/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, text })
-      });
-
-      const hasil = await res.json();
-      if (hasil.success) {
-        document.getElementById('text').value = '';
-        muatPesan();
-      } else {
-        alert('Gagal: ' + JSON.stringify(hasil.error));
+        const res = await fetch('/api/chats');
+        allChats = await res.json();
+        renderContacts();
+        if (activeContact && allChats[activeContact]) {
+          renderMessages(activeContact);
+        }
+      } catch (err) {
+        console.error("Gagal memuat chat:", err);
       }
     }
 
-    setInterval(muatPesan, 3000);
-    muatPesan();
+    function renderContacts() {
+      const listEl = document.getElementById('contactList');
+      listEl.innerHTML = '';
+      
+      const contacts = Object.keys(allChats);
+      if (contacts.length === 0) {
+        listEl.innerHTML = '<div style="padding: 15px; color: #777;">Belum ada kontak masuk</div>';
+        return;
+      }
+
+      contacts.forEach(phone => {
+        const div = document.createElement('div');
+        div.className = `contact-item ${activeContact === phone ? 'active' : ''}`;
+        div.innerHTML = `<strong>+${phone}</strong>`;
+        div.onclick = () => selectContact(phone);
+        listEl.appendChild(div);
+      });
+    }
+
+    function selectContact(phone) {
+      activeContact = phone;
+      document.getElementById('chatHeader').innerText = `Chat dengan: +${phone}`;
+      document.getElementById('chatInputArea').style.display = 'flex';
+      renderContacts();
+      renderMessages(phone);
+    }
+
+    function renderMessages(phone) {
+      const messagesEl = document.getElementById('chatMessages');
+      messagesEl.innerHTML = '';
+      
+      const messages = allChats[phone] || [];
+      messages.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `message ${msg.sender === 'customer' ? 'customer' : 'agent'}`;
+        div.innerHTML = `<div>${msg.text}</div><div class="time">${msg.time}</div>`;
+        messagesEl.appendChild(div);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const inputEl = document.getElementById('messageInput');
+      const text = inputEl.value.trim();
+      if (!text || !activeContact) return;
+
+      try {
+        const res = await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: activeContact, message: text })
+        });
+
+        if (res.ok) {
+          inputEl.value = '';
+          fetchChats(); // Refresh data chat
+        } else {
+          alert('Gagal mengirim pesan.');
+        }
+      } catch (err) {
+        console.error("Error:", err);
+      }
+    }
+
+    // Polling otomatis setiap 3 detik untuk memperbarui daftar chat & pesan masuk
+    setInterval(fetchChats, 3000);
+    fetchChats();
   </script>
 </body>
 </html>
-
