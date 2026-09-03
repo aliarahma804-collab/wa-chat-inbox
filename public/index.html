@@ -403,7 +403,7 @@
 
         <div class="contacts-list" id="contactsList">
           <div style="text-align: center; color: #94a3b8; padding: 40px 0; font-size: 13px;">
-            Memuat percakapan...
+            Belum ada riwayat percakapan. Mulai pesan baru lewat tombol + di bawah.
           </div>
         </div>
       </div>
@@ -516,7 +516,7 @@
         if (!res.ok) return;
         const data = await res.json();
         
-        allChats = data;
+        allChats = data || {};
         renderContactsList();
         if (activePhone) renderRoomMessages();
       } catch (err) {
@@ -526,19 +526,21 @@
 
     function renderContactsList() {
       const container = document.getElementById('contactsList');
-      const searchVal = document.getElementById('searchInput').value.toLowerCase();
-      const phones = Object.keys(allChats).filter(p => p.includes(searchVal));
+      const searchVal = (document.getElementById('searchInput').value || '').toLowerCase();
+      
+      const chatObj = (typeof allChats === 'object' && allChats !== null) ? allChats : {};
+      const phones = Object.keys(chatObj).filter(p => p.includes(searchVal));
 
       document.getElementById('bottomBadge').innerText = phones.length;
 
       if (phones.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 40px 0; font-size: 13px;">Belum ada riwayat percakapan</div>';
+        container.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 40px 0; font-size: 13px;">Belum ada riwayat percakapan. Mulai pesan baru lewat tombol + di bawah.</div>';
         return;
       }
 
       container.innerHTML = '';
       phones.forEach(phone => {
-        const msgs = allChats[phone] || [];
+        const msgs = chatObj[phone] || [];
         const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : { text: 'Belum ada pesan', time: '' };
         
         const card = document.createElement('div');
@@ -573,7 +575,7 @@
       const box = document.getElementById('roomMessages');
       box.innerHTML = '';
 
-      const msgs = allChats[activePhone] || [];
+      const msgs = (allChats && allChats[activePhone]) ? allChats[activePhone] : [];
       if (msgs.length === 0) {
         box.innerHTML = '<div style="text-align: center; color: #94a3b8; margin-top: 30px; font-size: 12px;">Kirim pesan pertama untuk memulai obrolan</div>';
         return;
