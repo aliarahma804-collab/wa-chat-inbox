@@ -1,78 +1,171 @@
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
+const multer = require('multer');
+const FormData = require('form-data');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Konfigurasi Supabase
-const supabaseUrl = process.env.SUPABASE_URL || 'https://mdtxqfgzageqpmnsbalc.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || 'sb_secret_tImX3ENgn-Ocw0dLe9MfXQ_qzxcv97V';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// ===============================
+// SUPABASE
+// ===============================
 
-// WhatsApp Cloud API Kredensial
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('SUPABASE_URL / SUPABASE_KEY belum diset');
+}
+
+const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+);
+
+// ===============================
+// WHATSAPP CLOUD API
+// ===============================
+
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-const WHATSAPP_TOKEN = process.env.ACCESS_TOKEN || process.env.WHATSAPP_TOKEN;
+const WHATSAPP_TOKEN =
+  process.env.ACCESS_TOKEN ||
+  process.env.WHATSAPP_TOKEN;
+
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
-// Webhook Verification (GET)
+const GRAPH_VERSION =
+  process.env.GRAPH_VERSION || 'v19.0';
+
+const GRAPH_URL =
+  `https://graph.facebook.com/${GRAPH_VERSION}`;
+
+// ===============================
+// UPLOAD CONFIG
+// ===============================
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  },
+
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('File harus berupa gambar'));
+    }
+
+    cb(null, true);
+  }
+});
+
+// ===============================
+// WEBHOOK VERIFICATION
+// ===============================
+
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
   if (mode && token === VERIFY_TOKEN) {
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
+    return res.status(200).send(challenge);
   }
+
+  res.sendStatus(403);
 });
 
-// Webhook Event Handler (POST) - Simpan pesan masuk ke Supabase
+// ===============================
+// WEBHOOK MESSAGE
+// ===============================
+
 app.post('/webhook', async (req, res) => {
   const body = req.body;
 
-  if (body.object) {
-    if (
-      body.entry &&
-      body.entry[0].changes &&
-      body.entry[0].changes[0].value.messages &&
-      body.entry[0].changes[0].value.messages[0]
-    ) {
-      const msg = body.entry[0].changes[0].value.messages[0];
-      const from = msg.from;
-      const text = msg.text ? msg.text.body : '[Media/Pesan Lain]';
-      const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  if (!body.object) {
+    return res.sendStatus(404);
+  }
 
-      try {
-        await supabase.from('chats').insert([
-          { phone: from, sender: 'customer', text: text, time: time }
-        ]);
-      } catch (err) {
-        console.error('Gagal simpan ke Supabase:', err.message);
+  try {
+    const message =
+      body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+
+    if (message) {
+      const from = message.from;
+
+      let text = '[Media/Pesan Lain]';
+
+      if (message.text?.body) {
+        text = message.text.body;
+      } else if (message.image) {
+        text = '📷 Gambar';
+      } else if (message.video) {
+        text = '🎥 Video';
+      } else if (message.document) {
+        text = '📄 Dokumen';
+      } else if (message.audio) {
+        text = '🎵 Audio';
       }
+
+      const time = new Date().toLocaleTimeString(
+        'id-ID',
+        {
+          hour: '2-digit',
+          minute: '2-digit'
+        }
+      );
+
+      await supabase
+        .from('chats')
+        .insert([
+          {
+            phone: from,
+            sender: 'customer',
+            text,
+            time
+          }
+        ]);
     }
+
     res.sendStatus(200);
-  } else {
-    res.sendStatus(404);
+
+  } catch (error) {
+    console.error(
+      'Webhook error:',
+      error.message
+    );
+
+    res.sendStatus(200);
   }
 });
 
-// Endpoint ambil histori obrolan
+// ===============================
+// GET CHATS
+// ===============================
+
 app.get('/api/chats', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('chats')
       .select('*')
-      .order('id', { ascending: true });
+      .order('id', {
+        ascending: true
+      });
 
     if (error) throw error;
 
     const groupedChats = {};
+
     data.forEach(item => {
-      if (!groupedChats[item.phone]) groupedChats[item.phone] = [];
+
+      if (!groupedChats[item.phone]) {
+        groupedChats[item.phone] = [];
+      }
+
       groupedChats[item.phone].push({
         id: item.id,
         sender: item.sender,
@@ -82,45 +175,323 @@ app.get('/api/chats', async (req, res) => {
     });
 
     res.json(groupedChats);
-  } catch (err) {
+
+  } catch (error) {
+
+    console.error(
+      'Get chats error:',
+      error.message
+    );
+
     res.status(500).json({});
   }
 });
 
-// Endpoint kirim pesan balasan
+// ===============================
+// SEND TEXT
+// ===============================
+
 app.post('/api/send', async (req, res) => {
+
   const { to, message } = req.body;
-  if (!to || !message) return res.status(400).json({ error: 'Data tidak lengkap' });
+
+  if (!to || !message) {
+    return res.status(400).json({
+      error: 'Data tidak lengkap'
+    });
+  }
 
   try {
-    const response = await axios({
-      method: 'POST',
-      url: `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
-      headers: {
-        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      data: {
+
+    const response = await axios.post(
+      `${GRAPH_URL}/${PHONE_NUMBER_ID}/messages`,
+
+      {
         messaging_product: 'whatsapp',
-        to: to,
+        to,
         type: 'text',
-        text: { body: message }
+        text: {
+          body: message
+        }
+      },
+
+      {
+        headers: {
+          Authorization:
+            `Bearer ${WHATSAPP_TOKEN}`,
+
+          'Content-Type':
+            'application/json'
+        }
       }
+    );
+
+    const time =
+      new Date().toLocaleTimeString(
+        'id-ID',
+        {
+          hour: '2-digit',
+          minute: '2-digit'
+        }
+      );
+
+    await supabase
+      .from('chats')
+      .insert([
+        {
+          phone: to,
+          sender: 'agent',
+          text: message,
+          time
+        }
+      ]);
+
+    res.json({
+      success: true,
+      data: response.data
     });
 
-    const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-
-    await supabase.from('chats').insert([
-      { phone: to, sender: 'agent', text: message, time: time }
-    ]);
-
-    res.json({ success: true, data: response.data });
   } catch (error) {
-    res.status(500).json({ error: 'Gagal kirim pesan' });
+
+    console.error(
+      'WhatsApp text error:',
+      error.response?.data ||
+      error.message
+    );
+
+    res.status(500).json({
+      error: 'Gagal kirim pesan',
+      details:
+        error.response?.data?.error?.message ||
+        error.message
+    });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-module.exports = app;
+// ===============================
+// SEND IMAGE
+// ===============================
 
+app.post(
+  '/api/send-image',
+  upload.single('image'),
+  async (req, res) => {
+
+    try {
+
+      const { to, caption } = req.body;
+
+      if (!to) {
+        return res.status(400).json({
+          error: 'Nomor tujuan tidak ada'
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          error: 'Gambar tidak ditemukan'
+        });
+      }
+
+      // ==========================
+      // 1. UPLOAD MEDIA KE WHATSAPP
+      // ==========================
+
+      const form = new FormData();
+
+      form.append(
+        'messaging_product',
+        'whatsapp'
+      );
+
+      form.append(
+        'file',
+        req.file.buffer,
+        {
+          filename:
+            req.file.originalname ||
+            'image.jpg',
+
+          contentType:
+            req.file.mimetype
+        }
+      );
+
+      const mediaResponse =
+        await axios.post(
+
+          `${GRAPH_URL}/${PHONE_NUMBER_ID}/media`,
+
+          form,
+
+          {
+            headers: {
+              Authorization:
+                `Bearer ${WHATSAPP_TOKEN}`,
+
+              ...form.getHeaders()
+            },
+
+            maxContentLength:
+              Infinity,
+
+            maxBodyLength:
+              Infinity
+          }
+        );
+
+      const mediaId =
+        mediaResponse.data.id;
+
+      if (!mediaId) {
+        throw new Error(
+          'WhatsApp tidak memberikan media ID'
+        );
+      }
+
+      // ==========================
+      // 2. KIRIM GAMBAR
+      // ==========================
+
+      const imageMessage = {
+        messaging_product:
+          'whatsapp',
+
+        to,
+
+        type:
+          'image',
+
+        image: {
+          id: mediaId
+        }
+      };
+
+      if (caption && caption.trim()) {
+        imageMessage.image.caption =
+          caption.trim();
+      }
+
+      const sendResponse =
+        await axios.post(
+
+          `${GRAPH_URL}/${PHONE_NUMBER_ID}/messages`,
+
+          imageMessage,
+
+          {
+            headers: {
+              Authorization:
+                `Bearer ${WHATSAPP_TOKEN}`,
+
+              'Content-Type':
+                'application/json'
+            }
+          }
+        );
+
+      // ==========================
+      // 3. SIMPAN KE DATABASE
+      // ==========================
+
+      const time =
+        new Date().toLocaleTimeString(
+          'id-ID',
+          {
+            hour: '2-digit',
+            minute: '2-digit'
+          }
+        );
+
+      let chatText = '📷 Gambar';
+
+      if (caption && caption.trim()) {
+        chatText =
+          `📷 Gambar\n${caption.trim()}`;
+      }
+
+      await supabase
+        .from('chats')
+        .insert([
+          {
+            phone: to,
+            sender: 'agent',
+            text: chatText,
+            time
+          }
+        ]);
+
+      // ==========================
+      // SUCCESS
+      // ==========================
+
+      res.json({
+        success: true,
+        media_id: mediaId,
+        data: sendResponse.data
+      });
+
+    } catch (error) {
+
+      console.error(
+        'WhatsApp image error:',
+        error.response?.data ||
+        error.message
+      );
+
+      res.status(500).json({
+        error: 'Gagal mengirim gambar',
+
+        details:
+          error.response?.data?.error?.message ||
+          error.message
+      });
+    }
+  }
+);
+
+// ===============================
+// MULTER ERROR
+// ===============================
+
+app.use(
+  (error, req, res, next) => {
+
+    if (
+      error instanceof multer.MulterError
+    ) {
+
+      return res.status(400).json({
+        error:
+          'Ukuran gambar terlalu besar atau upload bermasalah'
+      });
+    }
+
+    if (error) {
+
+      return res.status(400).json({
+        error: error.message
+      });
+    }
+
+    next();
+  }
+);
+
+// ===============================
+// SERVER
+// ===============================
+
+const PORT =
+  process.env.PORT || 3000;
+
+app.listen(
+  PORT,
+  () => {
+    console.log(
+      `Server running on port ${PORT}`
+    );
+  }
+);
+
+module.exports = app;
