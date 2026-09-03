@@ -2,168 +2,655 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WhatsApp Customer Inbox</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ChatFlow - WhatsApp Inbox</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; background: #efeae2; }
-    .sidebar { width: 320px; min-width: 260px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
-    .sidebar-header { padding: 15px; background: #00a884; color: white; font-weight: bold; }
-    .add-contact-box { padding: 10px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; gap: 6px; background: #f9f9f9; }
-    .add-contact-box input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-    .add-contact-box button { background: #00a884; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
-    .contact-list { overflow-y: auto; flex: 1; }
-    .contact-item { padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-    .contact-item:hover, .contact-item.active { background: #f0f2f5; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #0b141a; display: flex; justify-content: center; min-height: 100vh; }
     
-    .chat-area { flex: 1; display: flex; flex-direction: column; background: #efeae2; }
-    .chat-header { padding: 15px; background: #f0f2f5; font-weight: bold; border-bottom: 1px solid #ddd; }
-    .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .message { max-width: 60%; padding: 10px; border-radius: 8px; font-size: 14px; position: relative; }
-    .message.customer { background: white; align-self: flex-start; }
-    .message.agent { background: #d9fdd3; align-self: flex-end; }
-    .time { font-size: 10px; color: #999; margin-top: 4px; text-align: right; }
+    /* Container Handphone Modern */
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      height: 100vh;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    }
+
+    /* Top Bar Hijau */
+    .header-top {
+      background-color: #005c4b;
+      padding: 12px 16px;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand-box { display: flex; align-items: center; gap: 8px; }
+    .brand-title { font-weight: 700; font-size: 19px; letter-spacing: -0.5px; }
+    .badge-api {
+      background: rgba(255, 255, 255, 0.2);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .status-webhook {
+      background: rgba(255, 255, 255, 0.15);
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+    .btn-header-add {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    /* Sub Header Toko / Nomor */
+    .store-bar {
+      background-color: #004d3f;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #e9edef;
+    }
+    .store-info { display: flex; align-items: center; gap: 10px; }
+    .dot-status { width: 9px; height: 9px; background: #25d366; border-radius: 50%; }
+    .store-name { font-size: 13px; font-weight: 600; color: #ffffff; }
+    .store-phone { font-size: 11px; color: #aebac1; }
+    .store-badge {
+      background: rgba(0,0,0,0.25);
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 12px;
+      color: #d1d7db;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Halaman List Inbox */
+    .view-inbox { display: flex; flex-direction: column; flex: 1; overflow: hidden; position: relative; }
+    .content-scroll { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+    /* Search Bar */
+    .search-container { margin-bottom: 12px; position: relative; }
+    .search-container input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 13px;
+      background: #f8fafc;
+      outline: none;
+    }
+    .search-container i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    /* Banner 24 Jam */
+    .session-banner {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .session-banner i { color: #16a34a; font-size: 16px; margin-top: 2px; }
+    .session-banner p { font-size: 11.5px; color: #166534; line-height: 1.4; }
+
+    /* List Kontak */
+    .contacts-list { display: flex; flex-direction: column; gap: 8px; }
+    .contact-card {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid #f1f5f9;
+      background: #ffffff;
+      border-radius: 14px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      transition: background 0.15s;
+    }
+    .contact-card:hover { background: #f8fafc; }
+    .avatar-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      margin-right: 12px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .online-indicator {
+      width: 10px;
+      height: 10px;
+      background: #22c55e;
+      border: 2px solid white;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      right: 0;
+    }
+    .contact-details { flex: 1; min-width: 0; }
+    .contact-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .contact-name { font-size: 14px; font-weight: 600; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .contact-time { font-size: 11px; color: #94a3b8; }
+    .contact-bottom { display: flex; justify-content: space-between; align-items: center; }
+    .last-msg { font-size: 12.5px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px; }
+    .badge-unread {
+      background: #22c55e;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      min-width: 18px;
+      height: 18px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+    }
+
+    /* Floating Action Button */
+    .fab-btn {
+      position: absolute;
+      bottom: 74px;
+      right: 20px;
+      width: 52px;
+      height: 52px;
+      background: #00a884;
+      border-radius: 50%;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0, 168, 132, 0.4);
+      cursor: pointer;
+      font-size: 22px;
+      border: none;
+    }
+
+    /* Bottom Nav Bar */
+    .bottom-nav {
+      height: 60px;
+      background: white;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 6px;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #64748b;
+      text-decoration: none;
+      font-size: 10px;
+      gap: 4px;
+      cursor: pointer;
+      position: relative;
+    }
+    .nav-item.active { color: #00a884; font-weight: 600; }
+    .nav-item i { font-size: 18px; }
+    .nav-badge {
+      position: absolute;
+      top: -3px;
+      right: 1px;
+      background: #22c55e;
+      color: white;
+      font-size: 9px;
+      border-radius: 8px;
+      padding: 1px 4px;
+      font-weight: bold;
+    }
+
+    /* Halaman Chat Detail (Room) */
+    .view-chatroom {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #efeae2;
+      display: none;
+      flex-direction: column;
+      z-index: 100;
+    }
+    .chat-room-header {
+      background: #005c4b;
+      color: white;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn-back { background: transparent; border: none; color: white; font-size: 18px; cursor: pointer; }
+    .room-header-title { font-size: 15px; font-weight: 600; }
+    .room-header-status { font-size: 11px; color: #aebac1; }
     
-    .chat-input { padding: 15px; background: #f0f2f5; display: flex; gap: 10px; }
-    .chat-input input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
-    .chat-input button { background: #00a884; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+    .chat-room-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background-image: radial-gradient(#d1d7db 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+    .bubble {
+      max-width: 75%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      line-height: 1.4;
+      position: relative;
+    }
+    .bubble.customer {
+      background: #ffffff;
+      align-self: flex-start;
+      border-top-left-radius: 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .bubble.agent {
+      background: #d9fdd3;
+      align-self: flex-end;
+      border-top-right-radius: 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .bubble .time {
+      font-size: 10px;
+      color: #667781;
+      text-align: right;
+      margin-top: 3px;
+    }
+
+    .chat-room-input {
+      padding: 10px 12px;
+      background: #f0f2f5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chat-room-input input {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 20px;
+      border: 1px solid #ffffff;
+      background: #ffffff;
+      outline: none;
+      font-size: 13.5px;
+    }
+    .btn-send {
+      width: 40px;
+      height: 40px;
+      background: #00a884;
+      border: none;
+      border-radius: 50%;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+    }
+
+    /* Modal Tambah Kontak */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 16px;
+    }
+    .modal-box {
+      background: white;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    .modal-box h3 { font-size: 16px; margin-bottom: 12px; color: #1e293b; }
+    .modal-box input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 14px;
+      outline: none;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .btn-cancel { background: #f1f5f9; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; color: #64748b; }
+    .btn-confirm { background: #00a884; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; color: white; }
   </style>
 </head>
 <body>
 
-  <!-- Sidebar Daftar Kontak -->
-  <div class="sidebar">
-    <div class="sidebar-header">Daftar Percakapan</div>
+  <div class="app-container">
     
-    <!-- Form Tambah Kontak Baru Manual -->
-    <div class="add-contact-box">
-      <input type="text" id="newPhoneInput" placeholder="Nomor: 6285143545042" />
-      <button onclick="addNewContact()">+ Tambah Kontak</button>
+    <!-- TAMPILAN 1: DAFTAR INBOX (MIRIP GAMBAR) -->
+    <div class="view-inbox" id="viewInbox">
+      
+      <!-- Top Bar Hijau -->
+      <div class="header-top">
+        <div class="brand-box">
+          <i class="fa-regular fa-comment-dots" style="font-size: 20px;"></i>
+          <span class="brand-title">ChatFlow</span>
+          <span class="badge-api">CLOUD API</span>
+        </div>
+        <div class="header-actions">
+          <div class="status-webhook">
+            <i class="fa-solid fa-bolt" style="color: #4ade80;"></i> Webhook
+          </div>
+          <button class="btn-header-add" onclick="openAddModal()">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Store Sub-Header -->
+      <div class="store-bar">
+        <div class="store-info">
+          <div class="dot-status"></div>
+          <div>
+            <div class="store-name">WhatsApp Business Inbox</div>
+            <div class="store-phone">+62 882-9209-5527</div>
+          </div>
+        </div>
+        <div class="store-badge">
+          <span>Official API</span>
+          <i class="fa-solid fa-chevron-down" style="font-size: 10px;"></i>
+        </div>
+      </div>
+
+      <!-- Area Scroll Konten -->
+      <div class="content-scroll">
+        
+        <!-- Search Box -->
+        <div class="search-container">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" oninput="filterContacts()" placeholder="Cari pesan atau kontak...">
+        </div>
+
+        <!-- Banner Sesi 24 Jam Meta -->
+        <div class="session-banner">
+          <i class="fa-regular fa-circle-check"></i>
+          <p><strong>WhatsApp Cloud API Resmi:</strong> Sesi respon bebas biaya berlaku 24 jam setelah kontak mengirim pesan masuk.</p>
+        </div>
+
+        <!-- Daftar Kontak -->
+        <div class="contacts-list" id="contactsList">
+          <div style="text-align: center; color: #94a3b8; padding: 40px 0; font-size: 13px;">
+            Memuat percakapan...
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Floating Button Tambah Kontak -->
+      <button class="fab-btn" onclick="openAddModal()">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+
+      <!-- Bottom Nav Bar -->
+      <div class="bottom-nav">
+        <div class="nav-item active">
+          <i class="fa-solid fa-comment"></i>
+          <span class="nav-badge" id="bottomBadge">0</span>
+          <span>Chat</span>
+        </div>
+        <div class="nav-item" onclick="alert('Menu Kontak Tersedia!')">
+          <i class="fa-solid fa-users"></i>
+          <span>Kontak</span>
+        </div>
+        <div class="nav-item" onclick="alert('Menu Broadcast!')">
+          <i class="fa-solid fa-bullhorn"></i>
+          <span>Broadcast</span>
+        </div>
+        <div class="nav-item" onclick="alert('Menu Template Pesan!')">
+          <i class="fa-regular fa-file-lines"></i>
+          <span>Template</span>
+        </div>
+        <div class="nav-item" onclick="alert('Menu Pengaturan!')">
+          <i class="fa-solid fa-gear"></i>
+          <span>Setting</span>
+        </div>
+      </div>
+
     </div>
 
-    <div class="contact-list" id="contactList"></div>
+    <!-- TAMPILAN 2: RUANG CHAT AKTIF -->
+    <div class="view-chatroom" id="viewChatRoom">
+      <div class="chat-room-header">
+        <button class="btn-back" onclick="closeChatRoom()">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div>
+          <div class="room-header-title" id="roomTitle">+628...</div>
+          <div class="room-header-status">Online • Sesi Aktif</div>
+        </div>
+      </div>
+
+      <div class="chat-room-messages" id="roomMessages"></div>
+
+      <div class="chat-room-input">
+        <input type="text" id="roomInput" placeholder="Ketik pesan balasan..." onkeypress="handleEnter(event)">
+        <button class="btn-send" onclick="sendRoomMessage()">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Area Chat Utama -->
-  <div class="chat-area">
-    <div class="chat-header" id="chatHeader">Pilih kontak di sebelah kiri</div>
-    <div class="chat-messages" id="chatMessages">
-      <div style="text-align: center; color: #777; margin-top: 50px;">Belum ada obrolan yang dipilih</div>
-    </div>
-    <div class="chat-input" id="chatInputArea" style="display: none;">
-      <input type="text" id="messageInput" placeholder="Ketik pesan balasan..." />
-      <button onclick="sendMessage()">Kirim</button>
+  <!-- MODAL POPUP TAMBAH KONTAK -->
+  <div class="modal-backdrop" id="modalAdd">
+    <div class="modal-box">
+      <h3>Mulai Obrolan Baru</h3>
+      <input type="text" id="inputNewNumber" placeholder="Contoh: 628123456789">
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeAddModal()">Batal</button>
+        <button class="btn-confirm" onclick="confirmAddContact()">Buka Chat</button>
+      </div>
     </div>
   </div>
 
   <script>
     let allChats = {};
-    let activeContact = null;
+    let activePhone = null;
 
-    function addNewContact() {
-      const input = document.getElementById('newPhoneInput');
-      let phone = input.value.trim().replace(/[^0-9]/g, '');
-      
+    // Buka / Tutup Modal
+    function openAddModal() {
+      document.getElementById('modalAdd').style.display = 'flex';
+      document.getElementById('inputNewNumber').focus();
+    }
+    function closeAddModal() {
+      document.getElementById('modalAdd').style.display = 'none';
+      document.getElementById('inputNewNumber').value = '';
+    }
+
+    function confirmAddContact() {
+      let phone = document.getElementById('inputNewNumber').value.trim().replace(/[^0-9]/g, '');
       if (!phone) {
         alert('Masukkan nomor WhatsApp yang valid!');
         return;
       }
-      if (phone.startsWith('0')) {
-        phone = '62' + phone.slice(1);
-      }
+      if (phone.startsWith('0')) phone = '62' + phone.slice(1);
 
-      if (!allChats[phone]) {
-        allChats[phone] = [];
-      }
-      
-      input.value = '';
-      renderContacts();
-      selectContact(phone);
+      if (!allChats[phone]) allChats[phone] = [];
+      closeAddModal();
+      openChatRoom(phone);
     }
 
+    // Navigasi ke Ruang Chat
+    function openChatRoom(phone) {
+      activePhone = phone;
+      document.getElementById('roomTitle').innerText = '+' + phone;
+      document.getElementById('viewChatRoom').style.display = 'flex';
+      renderRoomMessages();
+    }
+
+    function closeChatRoom() {
+      activePhone = null;
+      document.getElementById('viewChatRoom').style.display = 'none';
+      fetchChats();
+    }
+
+    // Ambil data pesan dari server
     async function fetchChats() {
       try {
         const res = await fetch('/api/chats');
         const data = await res.json();
-        
         allChats = { ...allChats, ...data };
-        renderContacts();
-        if (activeContact && allChats[activeContact]) {
-          renderMessages(activeContact);
-        }
+        renderContactsList();
+        if (activePhone) renderRoomMessages();
       } catch (err) {
-        console.error("Gagal memuat chat:", err);
+        console.error('Gagal mengambil data percakapan:', err);
       }
     }
 
-    function renderContacts() {
-      const listEl = document.getElementById('contactList');
-      listEl.innerHTML = '';
-      
-      const contacts = Object.keys(allChats);
-      if (contacts.length === 0) {
-        listEl.innerHTML = '<div style="padding: 15px; color: #777;">Belum ada kontak</div>';
+    // Tampilkan daftar kontak
+    function renderContactsList() {
+      const container = document.getElementById('contactsList');
+      const searchVal = document.getElementById('searchInput').value.toLowerCase();
+      const phones = Object.keys(allChats).filter(p => p.includes(searchVal));
+
+      // Update badge nav bawah
+      const count = Object.keys(allChats).length;
+      document.getElementById('bottomBadge').innerText = count;
+
+      if (phones.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 40px 0; font-size: 13px;">Belum ada riwayat percakapan</div>';
         return;
       }
 
-      contacts.forEach(phone => {
-        const div = document.createElement('div');
-        div.className = `contact-item ${activeContact === phone ? 'active' : ''}`;
-        div.innerHTML = `<strong>+${phone}</strong>`;
-        div.onclick = () => selectContact(phone);
-        listEl.appendChild(div);
+      container.innerHTML = '';
+      phones.forEach(phone => {
+        const msgs = allChats[phone] || [];
+        const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : { text: 'Belum ada pesan', time: '' };
+        
+        const card = document.createElement('div');
+        card.className = 'contact-card';
+        card.onclick = () => openChatRoom(phone);
+        card.innerHTML = `
+          <div class="avatar-box">
+            ${phone.slice(-2)}
+            <div class="online-indicator"></div>
+          </div>
+          <div class="contact-details">
+            <div class="contact-head">
+              <span class="contact-name">+${phone}</span>
+              <span class="contact-time">${lastMsg.time || ''}</span>
+            </div>
+            <div class="contact-bottom">
+              <span class="last-msg">${lastMsg.text}</span>
+              ${msgs.length > 0 ? `<span class="badge-unread">${msgs.length}</span>` : ''}
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
       });
     }
 
-    function selectContact(phone) {
-      activeContact = phone;
-      document.getElementById('chatHeader').innerText = `Chat dengan: +${phone}`;
-      document.getElementById('chatInputArea').style.display = 'flex';
-      renderContacts();
-      renderMessages(phone);
+    function filterContacts() {
+      renderContactsList();
     }
 
-    function renderMessages(phone) {
-      const messagesEl = document.getElementById('chatMessages');
-      messagesEl.innerHTML = '';
-      
-      const messages = allChats[phone] || [];
-      if (messages.length === 0) {
-        messagesEl.innerHTML = '<div style="text-align: center; color: #777; margin-top: 50px;">Belum ada riwayat pesan. Kirim pesan pertama untuk memulai.</div>';
+    // Tampilkan pesan di dalam room chat
+    function renderRoomMessages() {
+      if (!activePhone) return;
+      const box = document.getElementById('roomMessages');
+      box.innerHTML = '';
+
+      const msgs = allChats[activePhone] || [];
+      if (msgs.length === 0) {
+        box.innerHTML = '<div style="text-align: center; color: #94a3b8; margin-top: 30px; font-size: 12px;">Kirim pesan pertama untuk memulai obrolan</div>';
         return;
       }
 
-      messages.forEach(msg => {
-        const div = document.createElement('div');
-        div.className = `message ${msg.sender === 'customer' ? 'customer' : 'agent'}`;
-        div.innerHTML = `<div>${msg.text}</div><div class="time">${msg.time}</div>`;
-        messagesEl.appendChild(div);
+      msgs.forEach(m => {
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${m.sender === 'customer' ? 'customer' : 'agent'}`;
+        bubble.innerHTML = `
+          <div>${m.text}</div>
+          <div class="time">${m.time || ''}</div>
+        `;
+        box.appendChild(bubble);
       });
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      box.scrollTop = box.scrollHeight;
     }
 
-    async function sendMessage() {
-      const inputEl = document.getElementById('messageInput');
-      const text = inputEl.value.trim();
-      if (!text || !activeContact) return;
+    // Kirim pesan balasan
+    async function sendRoomMessage() {
+      const input = document.getElementById('roomInput');
+      const text = input.value.trim();
+      if (!text || !activePhone) return;
 
       try {
         const res = await fetch('/api/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to: activeContact, message: text })
+          body: JSON.stringify({ to: activePhone, message: text })
         });
 
         if (res.ok) {
-          inputEl.value = '';
+          input.value = '';
           fetchChats();
         } else {
-          alert('Gagal mengirim pesan. Pastikan nomor sudah aktif atau kirimkan template terlebih dahulu.');
+          alert('Gagal mengirim pesan ke nomor ini.');
         }
       } catch (err) {
-        console.error("Error:", err);
+        console.error('Error kirim pesan:', err);
       }
     }
 
+    function handleEnter(e) {
+      if (e.key === 'Enter') sendRoomMessage();
+    }
+
+    // Polling data berkala
     setInterval(fetchChats, 3000);
     fetchChats();
   </script>
