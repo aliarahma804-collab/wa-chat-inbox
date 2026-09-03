@@ -1,97 +1,126 @@
 const express = require('express');
+const axios = require('axios');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-let chatHistories = {};
+// Konfigurasi Supabase
+const supabaseUrl = process.env.SUPABASE_URL || 'https://mdtxqfgzageqpmnsbalc.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'sb_secret_tImX3ENgn-Ocw0dLe9MfXQ_qzxcv97V';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Webhook Verification Meta
+// WhatsApp Cloud API Kredensial
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const WHATSAPP_TOKEN = process.env.ACCESS_TOKEN || process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+
+// Webhook Verification (GET)
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
-    return res.status(200).send(challenge);
+  if (mode && token === VERIFY_TOKEN) {
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
   }
-  return res.sendStatus(403);
 });
 
-// Terima Pesan Masuk
-app.post('/webhook', (req, res) => {
+// Webhook Event Handler (POST) - Simpan pesan masuk ke Supabase
+app.post('/webhook', async (req, res) => {
   const body = req.body;
-  if (body.object === 'whatsapp_business_account') {
-    body.entry?.forEach(entry => {
-      entry.changes?.forEach(change => {
-        if (change.value?.messages) {
-          change.value.messages.forEach(msg => {
-            const senderPhone = msg.from;
-            const messageText = msg.text ? msg.text.body : '[Media/Pesan Non-Teks]';
-            const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-            if (!chatHistories[senderPhone]) {
-              chatHistories[senderPhone] = [];
-            }
+  if (body.object) {
+    if (
+      body.entry &&
+      body.entry[0].changes &&
+      body.entry[0].changes[0].value.messages &&
+      body.entry[0].changes[0].value.messages[0]
+    ) {
+      const msg = body.entry[0].changes[0].value.messages[0];
+      const from = msg.from;
+      const text = msg.text ? msg.text.body : '[Media/Pesan Lain]';
+      const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-            chatHistories[senderPhone].push({
-              sender: 'customer',
-              text: messageText,
-              time: timestamp
-            });
-          });
-        }
+      try {
+        await supabase.from('chats').insert([
+          { phone: from, sender: 'customer', text: text, time: time }
+        ]);
+      } catch (err) {
+        console.error('Gagal simpan ke Supabase:', err.message);
+      }
+    }
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(404);
+  }
+});
+
+// Endpoint ambil histori obrolan
+app.get('/api/chats', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('chats')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (error) throw error;
+
+    const groupedChats = {};
+    data.forEach(item => {
+      if (!groupedChats[item.phone]) groupedChats[item.phone] = [];
+      groupedChats[item.phone].push({
+        id: item.id,
+        sender: item.sender,
+        text: item.text,
+        time: item.time
       });
     });
-    return res.status(200).send('EVENT_RECEIVED');
+
+    res.json(groupedChats);
+  } catch (err) {
+    res.status(500).json({});
   }
-  return res.sendStatus(404);
 });
 
-// Ambil Daftar Chat
-app.get('/api/chats', (req, res) => {
-  res.json(chatHistories);
-});
-
-// Kirim Pesan Teks
+// Endpoint kirim pesan balasan
 app.post('/api/send', async (req, res) => {
   const { to, message } = req.body;
-  if (!to || !message) return res.status(400).json({ error: 'Nomor dan pesan wajib diisi' });
+  if (!to || !message) return res.status(400).json({ error: 'Data tidak lengkap' });
 
   try {
-    const response = await fetch(`https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`, {
+    const response = await axios({
       method: 'POST',
+      url: `https://graph.facebook.com/v19.0/${PHONE_NUMBER_ID}/messages`,
       headers: {
-        'Authorization': `Bearer ${process.env.ACCESS_TOKEN}`,
+        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
+      data: {
+        messaging_product: 'whatsapp',
         to: to,
-        type: "text",
+        type: 'text',
         text: { body: message }
-      })
+      }
     });
 
-    const data = await response.json();
-    if (!response.ok) return res.status(400).json({ error: data.error?.message || 'Gagal kirim' });
+    const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-    const timestamp = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    if (!chatHistories[to]) chatHistories[to] = [];
-    chatHistories[to].push({
-      sender: 'agent',
-      text: message,
-      time: timestamp
-    });
+    await supabase.from('chats').insert([
+      { phone: to, sender: 'agent', text: message, time: time }
+    ]);
 
-    res.json({ success: true, data });
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' });
+    res.json({ success: true, data: response.data });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal kirim pesan' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
 module.exports = app;
+
